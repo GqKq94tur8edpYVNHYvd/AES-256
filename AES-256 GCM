@@ -2,6 +2,7 @@ import secrets
 import base64
 import re
 import textwrap
+import pyperclip
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -49,15 +50,15 @@ def decrypt_message(password: str, encoded_data: str) -> str:
     ciphertext = encrypted_data[44:]
     key = derive_key(password, salt)
     algorithm = algorithms.AES(key)
-    cipher = Cipher(algorithm, mode=modes.GCM(nonce, tag), backend=default_backend())
+    cipher = Cipher(algorithm, mode=modes.GCM(nonce), backend=default_backend())
     decryptor = cipher.decryptor()
     try:
-        decrypted_message = decryptor.update(ciphertext) + decryptor.finalize()
+        decrypted_message = decryptor.update(ciphertext) + decryptor.finalize_with_tag(tag)
+        return decrypted_message.decode()
     except Exception as e:
         return f"Decryption error: {str(e)}"
-    return decrypted_message.decode()
 
-# Function to validate password strength
+# Function to validate the password
 def validate_password(password: str) -> bool:
     if len(password) < 15:
         print("Password must be at least 15 characters long.")
@@ -93,9 +94,21 @@ def main():
         return
 
     if mode == 'e':
-        plaintext = input("Enter plaintext: ").strip()
+        print("Enter plaintext (end input with an empty line):")
+        plaintext_lines = []
+        while True:
+            try:
+                line = input()
+                if not line and plaintext_lines and plaintext_lines[-1] == '':
+                    break
+                plaintext_lines.append(line)
+            except EOFError:
+                break
+        plaintext = '\n'.join(plaintext_lines)
         encrypted_message = encrypt_message(password, plaintext)
         print(f"Encrypted:\n{encrypted_message}")
+        pyperclip.copy(encrypted_message)
+        print("The encrypted message has been copied to the clipboard.")
     elif mode == 'd':
         print("Enter ciphertext (end input with an empty line):")
         ciphertext_lines = []
